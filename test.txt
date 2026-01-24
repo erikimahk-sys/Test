@@ -304,7 +304,7 @@ local function SetupAdidasAnimations(plr)
         Animate.Disabled = true
         StopAnim(plr)
         Animate.run.RunAnim.AnimationId = "rbxassetid://124765145869332"
-        Animate.walk.WalkAnim.AnimationId = "rbxassetid://18537392113"
+        Animate.walk.WalkAnim.AnimationId = "rbxassetid://124765145869332"
         Animate.jump.JumpAnim.AnimationId = "rbxassetid://18537380791"
         Animate.idle.Animation1.AnimationId = "rbxassetid://18537376492"
         Animate.idle.Animation2.AnimationId = "rbxassetid://18537371272"
