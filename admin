@@ -7274,8 +7274,7 @@ local function ForceHighJumpThenFall(speaker)
     -- ไม่มี loop คงเลือด → ตายได้ถ้าไม่เรียก GOD mode ใหม่
 end
 
-
-function ForceFallDamageV2(speaker, damagePercent)
+function ForceFallDamageV2(speaker, damagePercent)  -- เวอร์ชัน 1000 speed ตายด้วย fall damage จริง ไม่ force Health=0
     local player = speaker
     if not player then return end
 
@@ -7286,56 +7285,77 @@ function ForceFallDamageV2(speaker, damagePercent)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not humanoid or not root then return end
 
-    damagePercent = damagePercent or 100  -- แก้ default เป็น 100% (ไม่ใช่ 500)
-    local baseHeight = 200                -- 100% = ตกจาก \~200 studs (ปรับได้)
+    damagePercent = damagePercent or 100
+    local baseHeight = 80                 -- ความสูงน้อยลงเพราะ speed สูงมาก ตกเสร็จไว
     local targetHeight = (damagePercent / 100) * baseHeight
 
-    -- คำนวณความเร็วที่ต้องการ (ยิ่งสูงยิ่งเร็ว เพื่อให้ดาเมจสูง)
-    -- Roblox terminal \~ -200 \~ -240, เราจะบังคับให้เร็วกว่านั้น
-    local fallSpeed = -math.clamp(150 + (damagePercent / 100) * 350, 180, 600)  
-    -- เช่น 100% → \~ -500, 200% → \~ -850 (แรงมาก ตายแน่)
+    -- 🔥 ความเร็วตกสุดขีด 1000+ เพื่อให้ impact velocity สูงมาก → fall damage Roblox ตายชัวร์
+    local maxFallSpeed = -math.clamp(900 + (damagePercent * 2.5), 1000, 2500)  
+    -- ตัวอย่าง:
+    -- 100% → \~ -1150
+    -- 150% → \~ -1275
+    -- 200% → \~ -1400 (แรงเกิน terminal velocity มาก → ดาเมจสูงสุดที่ Roblox ให้)
 
     local spawnPos = root.Position
-    local highPoint = Vector3.new(spawnPos.X, spawnPos.Y + targetHeight, spawnPos.Z)
+    local highPoint = Vector3.new(spawnPos.X, spawnPos.Y + targetHeight + 5, spawnPos.Z)
 
-    -- วาร์ปขึ้นไป
+    -- วาร์ปขึ้นเงียบ ๆ
     root.CFrame = CFrame.new(highPoint)
 
     -- รีเซ็ต velocity ก่อน
     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
 
-    -- ล็อกควบคุมชั่วคราว (ให้ดูเหมือนถูกโยน)
-    local originalWalkSpeed = humanoid.WalkSpeed
-    local originalJumpPower = humanoid.JumpPower
+    -- ล็อกการควบคุม
+    local origWalk = humanoid.WalkSpeed
+    local origJump = humanoid.JumpPower
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
     humanoid.PlatformStand = true
 
-    -- เร่งตกทันที (แทนการรอ gravity)
-    root.AssemblyLinearVelocity = Vector3.new(0, fallSpeed, 0)
+    -- 🚀 ตั้ง velocity ลงทันที (ตกเร็วมาก อัดพื้นในเสี้ยววินาที)
+    root.AssemblyLinearVelocity = Vector3.new(0, maxFallSpeed, 0)
 
-    -- เอฟเฟกต์กระเด็น/ลอยตอนชนพื้น (optional แต่ทำให้ดูแรง)
-    -- สามารถเพิ่ม particle หรือ animation ได้ที่นี่
+    -- เวลารอสั้นมาก (ตกเสร็จเร็ว)
+    local approxTime = (targetHeight / math.abs(maxFallSpeed)) + 0.08  -- buffer เล็กน้อย
+    task.wait(approxTime)
 
-    -- รอสั้น ๆ แล้วปลดล็อก (ไม่ต้องรอนานเหมือนตกจริง)
-    -- เวลารอประมาณตามความเร็ว + buffer เล็กน้อย
-    local approxFallTime = (targetHeight / math.abs(fallSpeed)) + 0.4
-    task.wait(approxFallTime)
+    -- กระเด็นลอย + หมุนตัวแรง (ดูเหมือนอัดพื้นแล้วเด้งขึ้นกลางอากาศ)
+    root.AssemblyLinearVelocity = Vector3.new(
+        math.random(-60, 60), 
+        180 + (damagePercent * 1.2),   -- กระเด็นขึ้นสูงตาม %
+        math.random(-60, 60)
+    )
+    root.AssemblyAngularVelocity = Vector3.new(
+        math.random(-80, 80), 
+        math.random(-100, 100), 
+        math.random(-80, 80)
+    )
 
-    -- ปลดล็อก
-    humanoid.WalkSpeed = originalWalkSpeed
-    humanoid.JumpPower = originalJumpPower
-    humanoid.PlatformStand = false
+    -- Ragdoll ชั่วคราว (ดูสมจริง + ลอยนานขึ้น)
+    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+    task.delay(2.2, function()
+        if humanoid and humanoid.Parent then
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+    end)
 
-    print("💥 " .. player.Name .. " ถูกบังคับตกแรง " .. damagePercent .. "% (\~" .. math.floor(targetHeight) 
-        .. " studs @ " .. math.floor(math.abs(fallSpeed)) .. " speed)")
+    -- ปลดล็อกการควบคุม (แต่ถ้าตายแล้วก็ไม่ต้องปลด)
+    task.delay(0.4, function()
+        if humanoid and humanoid.Parent and humanoid.Health > 0 then
+            humanoid.WalkSpeed = origWalk
+            humanoid.JumpPower = origJump
+            humanoid.PlatformStand = false
+        end
+    end)
+
+    print("💀💥 " .. player.Name .. " อัดพื้นด้วยความเร็ว " .. math.floor(math.abs(maxFallSpeed)) 
+        .. " | " .. damagePercent .. "% | สูง \~" .. math.floor(targetHeight) 
+        .. " studs | ตายด้วย fall damage จริง 100%!")
 end
 
--- ใช้งาน:
--- ForceFallDamage(player)                    → 100% damage (ตึก 10+ ชั้น)
--- ForceFallDamage(player, 50)               → 50% damage (ตึก 5 ชั้น)
--- ForceFallDamage(player, 25)               → 25% damage (ตึก 2-3 ชั้น)
+    
+                
 
 
 
