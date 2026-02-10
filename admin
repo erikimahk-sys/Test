@@ -7289,7 +7289,7 @@ local function ForceFallDamageV2(speaker, damagePercent)
 
     -- ปรับ damagePercent (0-100%) ถ้าไม่ส่งค่า = 100%
     damagePercent = damagePercent or 100
-    local targetHeight = (damagePercent / 100) * 200  -- สูงตาม % ที่ต้องการ (100% = 200 studs)
+    local targetHeight = (damagePercent / 100) * 300  -- สูงตาม % ที่ต้องการ (100% = 200 studs)
 
     -- 🔥 วาร์ปไปจุดสูงมาก แล้วปล่อยให้ตก (ไม่ใช้ velocity เพื่อให้ดูเป็นธรรมชาติ)
     local spawnPos = root.Position
