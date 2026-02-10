@@ -7275,8 +7275,7 @@ local function ForceHighJumpThenFall(speaker)
 end
 
 
---// ForceFallDamage → ตกจากสูงจริง (เท่าตึก 10 ชั้น) ได้รับดาเมจปกติ 100%
-local function ForceFallDamageV2(speaker, damagePercent)
+function ForceFallDamageV2(speaker, damagePercent)
     local player = speaker
     if not player then return end
 
@@ -7287,37 +7286,50 @@ local function ForceFallDamageV2(speaker, damagePercent)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not humanoid or not root then return end
 
-    -- ปรับ damagePercent (0-100%) ถ้าไม่ส่งค่า = 100%
-    damagePercent = damagePercent or 500
-    local targetHeight = (damagePercent / 100) * 500  -- สูงตาม % ที่ต้องการ (100% = 200 studs)
+    damagePercent = damagePercent or 100  -- แก้ default เป็น 100% (ไม่ใช่ 500)
+    local baseHeight = 200                -- 100% = ตกจาก \~200 studs (ปรับได้)
+    local targetHeight = (damagePercent / 100) * baseHeight
 
-    -- 🔥 วาร์ปไปจุดสูงมาก แล้วปล่อยให้ตก (ไม่ใช้ velocity เพื่อให้ดูเป็นธรรมชาติ)
+    -- คำนวณความเร็วที่ต้องการ (ยิ่งสูงยิ่งเร็ว เพื่อให้ดาเมจสูง)
+    -- Roblox terminal \~ -200 \~ -240, เราจะบังคับให้เร็วกว่านั้น
+    local fallSpeed = -math.clamp(150 + (damagePercent / 100) * 350, 180, 600)  
+    -- เช่น 100% → \~ -500, 200% → \~ -850 (แรงมาก ตายแน่)
+
     local spawnPos = root.Position
     local highPoint = Vector3.new(spawnPos.X, spawnPos.Y + targetHeight, spawnPos.Z)
-    
-    -- วาร์ปไปจุดสูง (ไม่ให้เห็นการเคลื่อนไหว)
+
+    -- วาร์ปขึ้นไป
     root.CFrame = CFrame.new(highPoint)
-    
-    -- รีเซ็ต velocity ให้เป็น 0 (ให้ gravity ทำงานเต็มที่)
+
+    -- รีเซ็ต velocity ก่อน
     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-    
-    -- ป้องกันการควบคุมชั่วคราว (ดูเหมือน "ถูกโยนลง")
+
+    -- ล็อกควบคุมชั่วคราว (ให้ดูเหมือนถูกโยน)
+    local originalWalkSpeed = humanoid.WalkSpeed
+    local originalJumpPower = humanoid.JumpPower
     humanoid.WalkSpeed = 0
     humanoid.JumpPower = 0
-    humanoid.PlatformStand = true  -- ล็อกการเคลื่อนไหว
-    
-    -- รอให้ตกถึงพื้น (คำนวณเวลาจาก physics)
-    local g = workspace.Gravity or 196.2
-    local fallTime = math.sqrt(2 * targetHeight / g) + 0.5  -- +0.5 buffer
-    task.wait(fallTime)
-    
-    -- ปลดล็อกการควบคุม
-    humanoid.WalkSpeed = 16
-    humanoid.JumpPower = 50
+    humanoid.PlatformStand = true
+
+    -- เร่งตกทันที (แทนการรอ gravity)
+    root.AssemblyLinearVelocity = Vector3.new(0, fallSpeed, 0)
+
+    -- เอฟเฟกต์กระเด็น/ลอยตอนชนพื้น (optional แต่ทำให้ดูแรง)
+    -- สามารถเพิ่ม particle หรือ animation ได้ที่นี่
+
+    -- รอสั้น ๆ แล้วปลดล็อก (ไม่ต้องรอนานเหมือนตกจริง)
+    -- เวลารอประมาณตามความเร็ว + buffer เล็กน้อย
+    local approxFallTime = (targetHeight / math.abs(fallSpeed)) + 0.4
+    task.wait(approxFallTime)
+
+    -- ปลดล็อก
+    humanoid.WalkSpeed = originalWalkSpeed
+    humanoid.JumpPower = originalJumpPower
     humanoid.PlatformStand = false
-    
-    print("💥 " .. player.Name .. " รับ Fall Damage " .. damagePercent .. "% (~" .. math.floor(targetHeight) .. " studs)")
+
+    print("💥 " .. player.Name .. " ถูกบังคับตกแรง " .. damagePercent .. "% (\~" .. math.floor(targetHeight) 
+        .. " studs @ " .. math.floor(math.abs(fallSpeed)) .. " speed)")
 end
 
 -- ใช้งาน:
